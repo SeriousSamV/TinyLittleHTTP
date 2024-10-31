@@ -39,6 +39,8 @@ typedef struct http_request {
 
 typedef struct http_response {
     http_version version;
+    uint8_t status_code;
+    uint8_t *reason_phrase;
     http_header *headers;
     size_t headers_cnt;
     uint8_t *body;
@@ -61,5 +63,18 @@ http_request *parse_http_request(const uint8_t *const http_packet, const size_t 
  * @param http_request The pointer to the HTTP request to be destroyed.
  */
 void destroy_http_request(http_request *http_request);
+
+enum render_http_response_status {
+    RENDER_OK = 0,
+    RENDER_E_MEM_ALLOC_FAILED = -1,
+    RENDER_E_RESPONSE_OBJ_IS_NULL = -2,
+    RENDER_E_OUT_PARAM_ADDR_IS_NULL = -3,
+    RENDER_E_HTTP_VERSION_NOT_SUPPORTED = -4,
+};
+
+enum render_http_response_status render_http_response(
+    const http_response *http_response,
+    uint8_t **out_response_octets,
+    size_t *out_response_len);
 
 #endif //TINY_HTTP_SERVER_LIB_H

@@ -133,11 +133,28 @@ void test_request_parse_head(void) {
     destroy_http_request(http_req);
 }
 
+void test_response_render_200_no_body(void) {
+    const http_response response = {
+        .version = HTTP_1_0,
+        .status_code = 200,
+        .reason_phrase = "OK",
+    };
+    uint8_t *response_octets = nullptr;
+    size_t response_octets_len = 0;
+    const enum render_http_response_status response_code = render_http_response(
+        &response, &response_octets, &response_octets_len);
+    assert(response_code == RENDER_OK);
+    assert(response_octets_len > 0);
+    assert(strncmp((char *) response_octets, "HTTP/1.0 200 OK\r\n", 32) == 0);
+}
+
 int main() {
     test_request_parse_get_root_curl();
     test_request_post_root_curl();
     test_request_post_root_curl_with_wide_chars();
     test_request_parse_head();
+
+    test_response_render_200_no_body();
 
     return EXIT_SUCCESS;
 }
