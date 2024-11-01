@@ -29,7 +29,7 @@ void test_request_parse_get_root_curl(void) {
     assert(http_req != nullptr);
     assert(http_req->method == GET);
     assert(http_req->version == HTTP_1_0);
-    assert(strncmp(http_req->url, "/", 1) == 0);
+    assert(strncmp(http_req->path, "/", 1) == 0);
     assert(http_req->headers_cnt == 3);
     assert(strncmp(http_req->headers[0]->name , "Host", 255) == 0);
     assert(strncmp(http_req->headers[0]->value, "localhost:8085", 255) == 0);
@@ -57,7 +57,7 @@ void test_request_post_root_curl(void) {
     assert(http_req != nullptr);
     assert(http_req->method == POST);
     assert(http_req->version == HTTP_1_0);
-    assert(strncmp(http_req->url, "/one/two/three", 255) == 0);
+    assert(strncmp(http_req->path, "/one/two/three", 255) == 0);
     assert(http_req->headers_cnt == 6);
     assert(strncmp(http_req->headers[0]->name, "Content-Type", 255) == 0);
     assert(strncmp(http_req->headers[0]->value, "application/json", 255) == 0);
@@ -94,7 +94,7 @@ void test_request_post_root_curl_with_wide_chars(void) {
     assert(http_req != nullptr);
     assert(http_req->method == POST);
     assert(http_req->version == HTTP_1_0);
-    assert(strncmp(http_req->url, "/one/🐌/three", 255) == 0);
+    assert(strncmp(http_req->path, "/one/🐌/three", 255) == 0);
     assert(http_req->headers_cnt == 7);
     assert(strncmp(http_req->headers[0]->name, "Content-Type", 255) == 0);
     assert(strncmp(http_req->headers[0]->value, "application/json", 255) == 0);
@@ -127,7 +127,7 @@ void test_request_parse_head(void) {
     assert(http_req != nullptr);
     assert(http_req->method == HEAD);
     assert(http_req->version == HTTP_1_0);
-    assert(strncmp(http_req->url, "/test", 255) == 0);
+    assert(strncmp(http_req->path, "/test", 255) == 0);
     assert(http_req->headers_cnt == 3);
     assert(strncmp(http_req->headers[0]->name, "Host", 255) == 0);
     assert(strncmp(http_req->headers[0]->value, "localhost:8085", 255) == 0);
@@ -209,11 +209,35 @@ void test_response_render_200_with_body(void) {
     }
 }
 
+void test_request_parse_get_urlencoded_path() {
+    const uint8_t request[] = "GET /some%20path%20with%20spaces HTTP/1.0\r\n"
+            "Host: localhost:8085\r\n"
+            "User-Agent: curl/7.68.0\r\n"
+            "Accept: */*\r\n"
+            "\r\n";
+    http_request *http_req = parse_http_request(&settings, request, strlen((char *) request));
+    assert(http_req != nullptr);
+    assert(http_req->method == GET);
+    assert(http_req->version == HTTP_1_0);
+    assert(strncmp(http_req->path, "/some path with spaces", 28) == 0);
+    assert(http_req->headers_cnt == 3);
+    assert(strncmp(http_req->headers[0]->name, "Host", 255) == 0);
+    assert(strncmp(http_req->headers[0]->value, "localhost:8085", 255) == 0);
+    assert(strncmp(http_req->headers[1]->name, "User-Agent", 255) == 0);
+    assert(strncmp(http_req->headers[1]->value, "curl/7.68.0", 255) == 0);
+    assert(strncmp(http_req->headers[2]->name, "Accept", 255) == 0);
+    assert(strncmp(http_req->headers[2]->value, "*/*", 255) == 0);
+    assert(http_req->body == nullptr);
+    assert(http_req->body_len == 0);
+    destroy_http_request(http_req);
+}
+
 int main() {
     test_request_parse_get_root_curl();
     test_request_post_root_curl();
     test_request_post_root_curl_with_wide_chars();
     test_request_parse_head();
+    test_request_parse_get_urlencoded_path();
 
     test_response_render_200_no_body();
     test_response_render_404_no_body();

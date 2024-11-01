@@ -3,6 +3,7 @@
 //
 
 #include "tiny_http_server_lib.h"
+#include "tiny_url_decoder_lib.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@ enum parse_http_request_status {
     PARSE_E_MALFORMED_HTTP_REQUEST_LINE = 4,
     PARSE_E_HTTP_VERSION_NOT_SUPPORTED = 5,
     PARSE_E_BODY_TOO_LARGE = 6,
+    PARSE_E_URL_DECODE = 7,
 };
 
 
@@ -47,8 +49,8 @@ void destroy_http_request(http_request *http_request) {
         http_request->headers_cnt = 0;
     }
     // ReSharper disable once CppDFANullDereference
-    free(http_request->url);
-    http_request->url = nullptr;
+    free(http_request->path);
+    http_request->path = nullptr;
     free(http_request);
 }
 
@@ -340,7 +342,52 @@ enum parse_http_request_status parse_http_request_line_from_packet(
         *ptr < http_packet_len && iter_cnt < settings->max_url_length;
         (*ptr)++, iter_cnt++) {
         if (http_packet[(*ptr)] == ' ') {
-            request->url = strndup((char *) &http_packet[start_uri], *ptr - start_uri);
+            if (*ptr - start_uri <= 0) {
+                fprintf(stderr, "malformed request line: not able to find path\n");
+                fflush(stderr);
+                return PARSE_E_MALFORMED_HTTP_REQUEST_LINE;
+            }
+            if (*ptr - start_uri == 1) {
+                if (http_packet[*ptr - 1] == '/') {
+                    request->path = strdup("/");
+                    (*ptr)++;
+                    break;
+                }
+            }
+            char *raw_path = strndup((char *) &http_packet[start_uri], *ptr - start_uri);
+            char *tok_state = calloc(*ptr - start_uri + 1, sizeof(char *));
+            request->path = calloc(*ptr - start_uri + 1, sizeof(char));
+            size_t path_len = 0;
+            char *token = strtok_r(raw_path, "/", &tok_state);
+            while (token != nullptr) {
+                uint8_t *url_decoded = nullptr;
+                size_t url_decoded_len = 0;
+                const enum url_decode_result res = url_decode(
+                    (const uint8_t *) token,
+                    strlen(token),
+                    &url_decoded,
+                    &url_decoded_len);
+                if (res != URL_DEC_OK) {
+                    fprintf(stderr, "cannot decode URL: %s\n", token);
+                    fflush(stderr);
+                    if (url_decoded != nullptr) free(url_decoded);
+                    free(token);
+                    free(tok_state);
+                    free(raw_path);
+                    return PARSE_E_URL_DECODE;
+                }
+                *(request->path + path_len) = '/';
+                path_len++;
+                strncpy(request->path + path_len, (char *) url_decoded, url_decoded_len);
+                path_len += url_decoded_len;
+                free(url_decoded);
+                url_decoded = nullptr;
+                url_decoded_len = 0;
+                token = strtok_r(nullptr, "/", &tok_state);
+            }
+            free(token);
+            free(tok_state);
+            free(raw_path);
             (*ptr)++;
             break;
         }

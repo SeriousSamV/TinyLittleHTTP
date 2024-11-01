@@ -17,9 +17,13 @@ enable_testing()
 
 add_subdirectory(./tiny_libs/TinyLittleURLUtils)
 
-add_library(tiny_http_server_lib src/tiny_http/tiny_http_server_lib.c src/tiny_http/tiny_http_server_lib.h)
+add_library(tiny_http_server_lib STATIC src/tiny_http/tiny_http_server_lib.c src/tiny_http/tiny_http_server_lib.h)
+target_include_directories(tiny_http_server_lib PUBLIC src/tiny_http)
+target_link_libraries(tiny_http_server_lib PRIVATE tiny_url_encoder_lib)
 
 add_executable(assert_tiny_http_server_lib test/assert_tiny_http_server_lib.c)
-target_link_libraries(assert_tiny_http_server_lib tiny_http_server_lib)
+target_link_libraries(assert_tiny_http_server_lib
+        PRIVATE tiny_http_server_lib
+        PRIVATE tiny_url_decoder_lib)
 
 add_test(test_tiny_http_server_lib assert_tiny_http_server_lib)
