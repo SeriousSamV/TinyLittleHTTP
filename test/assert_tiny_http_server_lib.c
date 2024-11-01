@@ -173,13 +173,13 @@ void test_response_render_200_with_body(void) {
             .reason_phrase = (uint8_t *) "OK",
             .headers_cnt = 2,
             .body = (uint8_t *) "{\n    \"key1\": \"value1\",\n    \"key2\": \"value2\"\n}",
-            .body_len = 48
+            .body_len = 46
         };
         response.headers = malloc(sizeof(struct http_header) * response.headers_cnt);
         response.headers[0].name = "Content-Type";
         response.headers[0].value = "application/json";
         response.headers[1].name = "Content-Length";
-        response.headers[1].value = "48";
+        response.headers[1].value = "46";
 
         uint8_t *response_octets = nullptr;
         size_t response_octets_len = 0;
@@ -192,10 +192,10 @@ void test_response_render_200_with_body(void) {
 
         const char *expected_response = "HTTP/1.0 200 OK\r\n"
                 "Content-Type: application/json\r\n"
-                "Content-Length: 48\r\n"
+                "Content-Length: 46\r\n"
                 "\r\n"
                 "{\n    \"key1\": \"value1\",\n    \"key2\": \"value2\"\n}";
-        const size_t expected_response_len = strlen(expected_response);
+        const size_t expected_response_len = strnlen(expected_response, 2000);
         assert(strncmp((char *)response_octets, expected_response, expected_response_len) == 0);
         assert(strnlen((char *) response_octets, expected_response_len) == response_octets_len);
         free(response_octets);
@@ -203,6 +203,9 @@ void test_response_render_200_with_body(void) {
 }
 
 int main() {
+    char *test = "hello\r\n";
+    assert(strnlen(test, 255) == 7);
+
     test_request_parse_get_root_curl();
     test_request_post_root_curl();
     test_request_post_root_curl_with_wide_chars();

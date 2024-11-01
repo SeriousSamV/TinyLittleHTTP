@@ -147,8 +147,6 @@ enum render_http_response_status render_http_response(
         strncpy((char *) *out_response_octets + octets_written, (const char *) http_response->body,
                 http_response->body_len);
         octets_written += http_response->body_len;
-        strcpy((char *) *out_response_octets + octets_written, "\r\n");
-        octets_written += 2;
     }
     // endregion body
 
