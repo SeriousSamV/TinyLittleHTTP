@@ -7,10 +7,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define MAX_URL_LENGTH 8000
-#define MAX_HTTP_HEADER_NAME_LENGTH 8000
-#define MAX_HTTP_HEADER_VALUE_LENGTH 8000
-
 typedef enum http_version {
     HTTP_1_0 = 1,
 } http_version;
@@ -51,6 +47,7 @@ typedef struct http_server_settings {
     size_t max_header_name_length;
     size_t max_header_value_length;
     size_t max_body_length;
+    size_t max_url_length;
 } http_server_settings;
 
 /**

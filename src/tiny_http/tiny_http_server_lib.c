@@ -305,6 +305,7 @@ enum parse_http_request_status parse_http_request_headers(
 }
 
 enum parse_http_request_status parse_http_request_line_from_packet(
+    const http_server_settings *const settings,
     const uint8_t *const http_packet,
     const size_t http_packet_len,
     http_request *request,
@@ -335,7 +336,9 @@ enum parse_http_request_status parse_http_request_line_from_packet(
     printf("request method: %d", request->method);
 #endif
 
-    for (int iter_cnt = 0; *ptr < http_packet_len && iter_cnt < MAX_URL_LENGTH; (*ptr)++, iter_cnt++) {
+    for (int iter_cnt = 0;
+        *ptr < http_packet_len && iter_cnt < settings->max_url_length;
+        (*ptr)++, iter_cnt++) {
         if (http_packet[(*ptr)] == ' ') {
             request->url = strndup((char *) &http_packet[start_uri], *ptr - start_uri);
             (*ptr)++;
@@ -403,7 +406,7 @@ http_request *parse_http_request(
     size_t ptr = 0;
 
     const enum parse_http_request_status request_line_parse_status =
-            parse_http_request_line_from_packet(http_packet, http_packet_len, request, &ptr);
+            parse_http_request_line_from_packet(settings, http_packet, http_packet_len, request, &ptr);
     if (request_line_parse_status != PARSE_OK) {
         destroy_http_request(request);
         return nullptr;

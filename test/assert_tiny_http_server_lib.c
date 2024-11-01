@@ -15,6 +15,7 @@ http_server_settings settings = {
     .max_header_name_length = 256,
     .max_header_value_length = 512,
     .max_body_length = 1024 * 1024 * 8, // 8M
+    .max_url_length = 8000 // NOTE: should be ~2000, but meh the standards doesn't have a comment on it, SEO says 2000
 };
 
 void test_request_parse_get_root_curl(void) {
