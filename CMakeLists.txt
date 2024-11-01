@@ -15,6 +15,8 @@ endif()
 include(CTest)
 enable_testing()
 
+add_subdirectory(./tiny_libs/TinyLittleURLUtils)
+
 add_library(tiny_http_server_lib src/tiny_http/tiny_http_server_lib.c src/tiny_http/tiny_http_server_lib.h)
 
 add_executable(assert_tiny_http_server_lib test/assert_tiny_http_server_lib.c)
