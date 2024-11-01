@@ -39,7 +39,7 @@ typedef struct http_request {
 
 typedef struct http_response {
     http_version version;
-    uint8_t status_code;
+    uint16_t status_code;
     uint8_t *reason_phrase;
     http_header *headers;
     size_t headers_cnt;
