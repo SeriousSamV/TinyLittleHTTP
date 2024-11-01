@@ -146,6 +146,7 @@ void test_response_render_200_no_body(void) {
     assert(response_code == RENDER_OK);
     assert(response_octets_len > 0);
     assert(strncmp((char *) response_octets, "HTTP/1.0 200 OK\r\n", 32) == 0);
+    free(response_octets);
 }
 
 void test_response_render_404_no_body(void) {
@@ -161,6 +162,7 @@ void test_response_render_404_no_body(void) {
     assert(response_code == RENDER_OK);
     assert(response_octets_len > 0);
     assert(strncmp((char *) response_octets, "HTTP/1.0 404 Not Found\r\n", 32) == 0);
+    free(response_octets);
 }
 
 void test_response_render_200_with_body(void) {
@@ -193,8 +195,9 @@ void test_response_render_200_with_body(void) {
                 "Content-Length: 48\r\n"
                 "\r\n"
                 "{\n    \"key1\": \"value1\",\n    \"key2\": \"value2\"\n}";
-        assert(strncmp((char *)response_octets, expected_response, response_octets_len) == 0);
-        assert(strnlen((char *) response_octets, response_octets_len + 8) == response_octets_len);
+        const size_t expected_response_len = strlen(expected_response);
+        assert(strncmp((char *)response_octets, expected_response, expected_response_len) == 0);
+        assert(strnlen((char *) response_octets, expected_response_len) == response_octets_len);
         free(response_octets);
     }
 }

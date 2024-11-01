@@ -113,8 +113,44 @@ enum render_http_response_status render_http_response(
     octets_written += 2;
     // endregion status line
 
+    // region headers
+    // <header name>: <header value><CR><LF>
     if (http_response->headers != nullptr && http_response->headers_cnt > 0) {
+        for (size_t i = 0; i < http_response->headers_cnt; i++) {
+            const size_t header_name_len = strnlen(http_response->headers[i].name, 2000);
+            strncpy(
+                (char *) *out_response_octets + octets_written,
+                http_response->headers[i].name,
+                header_name_len);
+            octets_written += header_name_len;
+            strcpy((char *) *out_response_octets + octets_written, ": ");
+            octets_written += 2;
+
+            const size_t header_value_len = strnlen(http_response->headers[i].value, 2000);
+            strncpy(
+                (char *) *out_response_octets + octets_written,
+                http_response->headers[i].value,
+                header_value_len);
+            octets_written += header_value_len;
+            strcpy((char *) *out_response_octets + octets_written, "\r\n");
+            octets_written += 2;
+        }
+
+        strncpy((char *) *out_response_octets + octets_written, "\r\n", 2);
+        octets_written += 2;
     }
+    // endregion headers
+
+    // region body
+    // <body octets><CR><LF>
+    if (http_response->body != nullptr && http_response->body_len > 0) {
+        strncpy((char *) *out_response_octets + octets_written, (const char *) http_response->body,
+                http_response->body_len);
+        octets_written += http_response->body_len;
+        strcpy((char *) *out_response_octets + octets_written, "\r\n");
+        octets_written += 2;
+    }
+    // endregion body
 
     *out_response_len = octets_written;
     return RENDER_OK;
