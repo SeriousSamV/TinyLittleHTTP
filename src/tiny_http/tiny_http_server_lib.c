@@ -26,7 +26,7 @@ enum parse_http_request_status {
  */
 void destroy_http_request(http_request *http_request) {
     if (http_request == nullptr) {
-        fprintf(stderr, "http_request is already null");
+        fprintf(stderr, "http_request is already null\n");
         fflush(stderr);
         return;
     }
@@ -53,13 +53,13 @@ enum render_http_response_status render_http_response(
     uint8_t **out_response_octets,
     size_t *out_response_len) {
     if (http_response == nullptr) {
-        fprintf(stderr, "http_response is already null");
+        fprintf(stderr, "http_response is already null\n");
         fflush(stderr);
         *out_response_len = 0;
         return RENDER_E_RESPONSE_OBJ_IS_NULL;
     }
     if (out_response_len == nullptr) {
-        fprintf(stderr, "out_response_len is null");
+        fprintf(stderr, "out_response_len is null\n");
         fflush(stderr);
         return RENDER_E_OUT_PARAM_ADDR_IS_NULL;
     }
@@ -68,7 +68,7 @@ enum render_http_response_status render_http_response(
         http_response->body_len + http_response->headers_cnt * 2000 + 32,
         sizeof(uint8_t));
     if (*out_response_octets == nullptr) {
-        fprintf(stderr, "cannot alloc mem for out_response_octets");
+        fprintf(stderr, "cannot alloc mem for out_response_octets\n");
         fflush(stderr);
         *out_response_len = 0;
         return RENDER_E_MEM_ALLOC_FAILED;
@@ -88,7 +88,7 @@ enum render_http_response_status render_http_response(
         strcpy((char *) *out_response_octets + octets_written, "1.0");
         octets_written += 3;
     } else {
-        fprintf(stderr, "unsupported HTTP version");
+        fprintf(stderr, "unsupported HTTP version\n");
         fflush(stderr);
         *out_response_len = 0;
         free(*out_response_octets);
@@ -196,7 +196,7 @@ enum parse_http_request_status parse_http_request_headers(
             }
         }
         if (header_name_len == 0) {
-            fprintf(stderr, "malformed header");
+            fprintf(stderr, "malformed header\n");
             fflush(stderr);
             return PARSE_E_MALFORMED_HTTP_HEADER;
         }
@@ -220,14 +220,14 @@ enum parse_http_request_status parse_http_request_headers(
         if (request->headers == nullptr) {
             request->headers = calloc(1, sizeof(http_header *));
             if (request->headers == nullptr) {
-                fprintf(stderr, "cannot allocate memory for new headers");
+                fprintf(stderr, "cannot allocate memory for new headers\n");
                 fflush(stderr);
                 return PARSE_E_ALLOC_MEM_FOR_HEADERS;
             }
         } else {
             http_header **new_headers = realloc(request->headers, sizeof(http_header *) * (i + 1));
             if (new_headers == nullptr) {
-                fprintf(stderr, "cannot allocate memory for new headers");
+                fprintf(stderr, "cannot allocate memory for new headers\n");
                 fflush(stderr);
                 return PARSE_E_ALLOC_MEM_FOR_HEADERS;
             }
@@ -261,7 +261,7 @@ enum parse_http_request_status parse_http_request_line_from_packet(
         start_uri = 5;
         request->method = HEAD;
     } else {
-        fprintf(stderr, "right now, only HTTP GET and POST verbs are supported");
+        fprintf(stderr, "right now, only HTTP GET and POST verbs are supported\n");
         fflush(stderr);
         return PARSE_E_HTTP_METHOD_NOT_SUPPORTED;
     }
@@ -286,7 +286,7 @@ enum parse_http_request_status parse_http_request_line_from_packet(
     if (strncmp((char *) http_packet + *ptr, "HTTP", 4) == 0) {
         *ptr += 5; // 'HTTP/' - 5
     } else {
-        fprintf(stderr, "illegal http packet");
+        fprintf(stderr, "illegal http packet\n");
         fflush(stderr);
         return PARSE_E_MALFORMED_HTTP_REQUEST_LINE;
     }
@@ -297,7 +297,7 @@ enum parse_http_request_status parse_http_request_line_from_packet(
         printf("http version: %d", request->version);
 #endif
     } else {
-        fprintf(stderr, "right now, only HTTP 1.0 is supported");
+        fprintf(stderr, "right now, only HTTP 1.0 is supported\n");
         fflush(stderr);
         return PARSE_E_HTTP_VERSION_NOT_SUPPORTED;
     }
@@ -320,13 +320,13 @@ enum parse_http_request_status parse_http_request_line_from_packet(
  */
 http_request *parse_http_request(const uint8_t *const http_packet, const size_t http_packet_len) {
     if (http_packet != nullptr && http_packet_len <= 5) {
-        fprintf(stderr, "cannot parse http request as it appears empty");
+        fprintf(stderr, "cannot parse http request as it appears empty\n");
         fflush(stderr);
         return nullptr;
     }
     http_request *request = calloc(1, sizeof(http_request));
     if (request == nullptr) {
-        fprintf(stderr, "cannot allocate memory for new http request");
+        fprintf(stderr, "cannot allocate memory for new http request\n");
         fflush(stderr);
         return nullptr;
     }
