@@ -11,6 +11,12 @@
 
 #include "../src/tiny_http/tiny_http_server_lib.h"
 
+http_server_settings settings = {
+    .max_header_name_length = 256,
+    .max_header_value_length = 512,
+    .max_body_length = 1024 * 1024 * 8, // 8M
+};
+
 void test_request_parse_get_root_curl(void) {
     // ReSharper disable once CppVariableCanBeMadeConstexpr
     const uint8_t request[] = "GET / HTTP/1.0\r\n"
@@ -18,7 +24,7 @@ void test_request_parse_get_root_curl(void) {
             "User-Agent: curl/8.7.1\r\n"
             "Accept: */*\r\n"
             "\r\n";
-    http_request *http_req = parse_http_request(request, strlen((char *) request));
+    http_request *http_req = parse_http_request(&settings, request, strlen((char *) request));
     assert(http_req != nullptr);
     assert(http_req->method == GET);
     assert(http_req->version == HTTP_1_0);
@@ -46,7 +52,7 @@ void test_request_post_root_curl(void) {
             "Content-Length: 68\r\n"
             "\r\n"
             "{\n    \"key1\": \"value1\",\n    \"key2\": \"value2\",\n    \"key3\": \"value3\"\n}";
-    http_request *http_req = parse_http_request(request, strlen((char *) request));
+    http_request *http_req = parse_http_request(&settings, request, strlen((char *) request));
     assert(http_req != nullptr);
     assert(http_req->method == POST);
     assert(http_req->version == HTTP_1_0);
@@ -83,7 +89,7 @@ void test_request_post_root_curl_with_wide_chars(void) {
             "Content-Length: 68\r\n"
             "\r\n"
             "{\n    \"key1\": \"🐌\",\n    \"key2\": \"value2\",\n    \"key3\": \"value3\"\n}";
-    http_request *http_req = parse_http_request(request, strlen((char *) request));
+    http_request *http_req = parse_http_request(&settings, request, strlen((char *) request));
     assert(http_req != nullptr);
     assert(http_req->method == POST);
     assert(http_req->version == HTTP_1_0);
@@ -116,7 +122,7 @@ void test_request_parse_head(void) {
             "User-Agent: custom-agent/1.0\r\n"
             "Accept: */*\r\n"
             "\r\n";
-    http_request *http_req = parse_http_request(request, strlen((char *) request));
+    http_request *http_req = parse_http_request(&settings, request, strlen((char *) request));
     assert(http_req != nullptr);
     assert(http_req->method == HEAD);
     assert(http_req->version == HTTP_1_0);
@@ -142,7 +148,7 @@ void test_response_render_200_no_body(void) {
     uint8_t *response_octets = nullptr;
     size_t response_octets_len = 0;
     const enum render_http_response_status response_code = render_http_response(
-        &response, &response_octets, &response_octets_len);
+        &settings, &response, &response_octets, &response_octets_len);
     assert(response_code == RENDER_OK);
     assert(response_octets_len > 0);
     assert(strncmp((char *) response_octets, "HTTP/1.0 200 OK\r\n", 32) == 0);
@@ -158,7 +164,7 @@ void test_response_render_404_no_body(void) {
     uint8_t *response_octets = nullptr;
     size_t response_octets_len = 0;
     const enum render_http_response_status response_code = render_http_response(
-        &response, &response_octets, &response_octets_len);
+        &settings, &response, &response_octets, &response_octets_len);
     assert(response_code == RENDER_OK);
     assert(response_octets_len > 0);
     assert(strncmp((char *) response_octets, "HTTP/1.0 404 Not Found\r\n", 32) == 0);
@@ -185,7 +191,7 @@ void test_response_render_200_with_body(void) {
         size_t response_octets_len = 0;
 
         const enum render_http_response_status response_code = render_http_response(
-            &response, &response_octets, &response_octets_len);
+            &settings, &response, &response_octets, &response_octets_len);
 
         assert(response_code == RENDER_OK);
         assert(response_octets_len > 0);
@@ -203,9 +209,6 @@ void test_response_render_200_with_body(void) {
 }
 
 int main() {
-    char *test = "hello\r\n";
-    assert(strnlen(test, 255) == 7);
-
     test_request_parse_get_root_curl();
     test_request_post_root_curl();
     test_request_post_root_curl_with_wide_chars();

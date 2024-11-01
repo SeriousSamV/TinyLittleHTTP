@@ -47,15 +47,25 @@ typedef struct http_response {
     size_t body_len;
 } http_response;
 
+typedef struct http_server_settings {
+    size_t max_header_name_length;
+    size_t max_header_value_length;
+    size_t max_body_length;
+} http_server_settings;
+
 /**
  * Parses an HTTP request from the given http packet in octets.
  *
+ * @param settings
  * @param http_packet A pointer to the HTTP packet to parse.
  * @param http_packet_len The length of the HTTP packet.
  *
  * @return A pointer to the parsed HTTP request, or nullptr if parsing fails.
  */
-http_request *parse_http_request(const uint8_t *const http_packet, const size_t http_packet_len);
+http_request *parse_http_request(
+    const http_server_settings *const settings,
+    const uint8_t *const http_packet,
+    const size_t http_packet_len);
 
 /**
  * Frees the memory allocated for the given HTTP request and its components.
@@ -73,6 +83,7 @@ enum render_http_response_status {
 };
 
 enum render_http_response_status render_http_response(
+    const http_server_settings *const settings,
     const http_response *http_response,
     uint8_t **out_response_octets,
     size_t *out_response_len);

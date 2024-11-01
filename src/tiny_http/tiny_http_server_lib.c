@@ -16,6 +16,7 @@ enum parse_http_request_status {
     PARSE_E_HTTP_METHOD_NOT_SUPPORTED = 3,
     PARSE_E_MALFORMED_HTTP_REQUEST_LINE = 4,
     PARSE_E_HTTP_VERSION_NOT_SUPPORTED = 5,
+    PARSE_E_BODY_TOO_LARGE = 6,
 };
 
 
@@ -31,11 +32,13 @@ void destroy_http_request(http_request *http_request) {
         return;
     }
     if (http_request->body != nullptr) {
+        // ReSharper disable once CppDFANullDereference
         free(http_request->body);
         http_request->body = nullptr;
         http_request->body_len = 0;
     }
     if (http_request->headers != nullptr) {
+        // ReSharper disable once CppDFANullDereference
         for (size_t i = 0; i < http_request->headers_cnt; i++) {
             free(http_request->headers[i]);
             http_request->headers[i] = nullptr;
@@ -43,12 +46,14 @@ void destroy_http_request(http_request *http_request) {
         http_request->headers = nullptr;
         http_request->headers_cnt = 0;
     }
+    // ReSharper disable once CppDFANullDereference
     free(http_request->url);
     http_request->url = nullptr;
     free(http_request);
 }
 
 enum render_http_response_status render_http_response(
+    const http_server_settings *const settings,
     const http_response *http_response,
     uint8_t **out_response_octets,
     size_t *out_response_len) {
@@ -65,7 +70,9 @@ enum render_http_response_status render_http_response(
     }
     *out_response_octets = calloc(
         // TODO: have a way to predict the size more accurately to avoid over or under allocation
-        http_response->body_len + http_response->headers_cnt * 2000 + 32,
+        http_response->body_len +
+        http_response->headers_cnt * (settings->max_header_name_length + settings->max_header_value_length) +
+        32,
         sizeof(uint8_t));
     if (*out_response_octets == nullptr) {
         fprintf(stderr, "cannot alloc mem for out_response_octets\n");
@@ -156,6 +163,7 @@ enum render_http_response_status render_http_response(
 
 /**
  *
+ * @param settings
  * @param headers http_headers from which we've to get the Content-Length
  * @param num_headers number of headers
  * @return the value of `Content-Length` header or error (negative)
@@ -163,11 +171,14 @@ enum render_http_response_status render_http_response(
  * @retval -1 headers is NULL
  * @retval -2 the `Content-Length` header is not found
  */
-ssize_t get_body_size_from_header(const http_header *const *const headers, const size_t num_headers) {
+ssize_t get_body_size_from_header(
+    const http_server_settings *const settings,
+    const http_header *const *const headers,
+    const size_t num_headers) {
     if (headers == nullptr) return -1;
     for (size_t i = 0; i < num_headers; i++) {
         if (headers[i] == nullptr) continue;
-        if (strncmp(headers[i]->name, "Content-Length", 15) == 0) {
+        if (strncmp(headers[i]->name, "Content-Length", settings->max_header_name_length) == 0) {
             return strtol(headers[i]->value, nullptr, 10);
         }
     }
@@ -177,12 +188,14 @@ ssize_t get_body_size_from_header(const http_header *const *const headers, const
 /**
  * Adds the `body` and `body_len` attributes for the `http_request` being parsed
  *
+ * @param settings
  * @param http_packet http packet stream
  * @param http_packet_len http packet stream length
  * @param request the http_request object being parsed
  * @param ptr the http packet stream scan ptr
  */
 enum parse_http_request_status parse_http_request_body(
+    const http_server_settings * const settings,
     const uint8_t *const http_packet,
     const size_t http_packet_len,
     http_request *request,
@@ -195,13 +208,22 @@ enum parse_http_request_status parse_http_request_body(
     if (*ptr < http_packet_len) {
         const ssize_t body_len_from_header = request != nullptr && request->headers != nullptr
                                                  ? get_body_size_from_header(
-                                                     (const http_header * const * const) request->headers,
+                                                     settings,
+                                                     // ReSharper disable once CppRedundantCastExpression
+                                                     // ReSharper disable once CppDFANullDereference
+                                                     (const http_header *const *const) request->headers,
                                                      request->headers_cnt)
-                                                 : 0;
+                                                 : -42;
         if (body_len_from_header >= 0) {
             request->body_len = body_len_from_header;
         } else {
+            // ReSharper disable once CppDFANullDereference
             request->body_len = http_packet_len - *ptr;
+        }
+        if (request->body_len > settings->max_body_length) {
+            fprintf(stderr, "Error: body length too large\n");
+            fflush(stderr);
+            return PARSE_E_BODY_TOO_LARGE;
         }
         request->body = (uint8_t *) strndup((char *) http_packet + *ptr, request->body_len);
     }
@@ -209,6 +231,7 @@ enum parse_http_request_status parse_http_request_body(
 }
 
 enum parse_http_request_status parse_http_request_headers(
+    const http_server_settings *const settings,
     const uint8_t *const http_packet,
     const size_t http_packet_len,
     http_request *request,
@@ -218,12 +241,15 @@ enum parse_http_request_status parse_http_request_headers(
         if ((*ptr >= http_packet_len || *ptr + 1 >= http_packet_len)
             || (http_packet[(*ptr)] == '\r'
                 && http_packet[*ptr + 1] == '\n')) {
+            // is end-of-headers
             break;
         }
         http_header *header = calloc(1, sizeof(http_header));
         const size_t header_name_start_ptr = *ptr;
         size_t header_name_len = 0;
-        for (int iter_cnt = 0; *ptr < http_packet_len && iter_cnt < MAX_HTTP_HEADER_NAME_LENGTH; (*ptr)++, iter_cnt++) {
+        for (int iter_cnt = 0;
+             *ptr < http_packet_len && iter_cnt < settings->max_header_name_length;
+             (*ptr)++, iter_cnt++) {
             if (http_packet[(*ptr)] == ' ') {
                 header_name_len = *ptr - header_name_start_ptr;
                 break;
@@ -243,7 +269,8 @@ enum parse_http_request_status parse_http_request_headers(
         }
         const size_t header_value_start = *ptr;
         size_t header_value_len = 0;
-        for (int iter_cnt = 0; *ptr < http_packet_len && iter_cnt < MAX_HTTP_HEADER_VALUE_LENGTH;
+        for (int iter_cnt = 0;
+             *ptr < http_packet_len && iter_cnt < settings->max_header_value_length;
              (*ptr)++, iter_cnt++) {
             if (http_packet[(*ptr)] == '\r' && http_packet[*ptr + 1] == '\n') {
                 header_value_len = *ptr - header_value_start;
@@ -252,6 +279,7 @@ enum parse_http_request_status parse_http_request_headers(
         }
         header->value = strndup((char *) http_packet + *ptr - header_value_len, header_value_len);
         if (request->headers == nullptr) {
+            // ReSharper disable once CppDFANullDereference
             request->headers = calloc(1, sizeof(http_header *));
             if (request->headers == nullptr) {
                 fprintf(stderr, "cannot allocate memory for new headers\n");
@@ -265,6 +293,7 @@ enum parse_http_request_status parse_http_request_headers(
                 fflush(stderr);
                 return PARSE_E_ALLOC_MEM_FOR_HEADERS;
             }
+            // ReSharper disable once CppDFANullDereference
             request->headers = new_headers;
         }
         request->headers[i] = header;
@@ -285,14 +314,17 @@ enum parse_http_request_status parse_http_request_line_from_packet(
     if (strncmp((char *) http_packet, "GET", 3) == 0) {
         *ptr += 4; // "GET " - 4
         start_uri = 4;
+        // ReSharper disable once CppDFANullDereference
         request->method = GET;
     } else if (strncmp((char *) http_packet, "POST", 4) == 0) {
         *ptr += 5; // "POST" - 5
         start_uri = 5;
+        // ReSharper disable once CppDFANullDereference
         request->method = POST;
     } else if (strncmp((char *) http_packet, "HEAD", 4) == 0) {
         *ptr += 5; // "HEAD" - 5
         start_uri = 5;
+        // ReSharper disable once CppDFANullDereference
         request->method = HEAD;
     } else {
         fprintf(stderr, "right now, only HTTP GET and POST verbs are supported\n");
@@ -347,12 +379,16 @@ enum parse_http_request_status parse_http_request_line_from_packet(
 /**
  * Parses an HTTP request from the given http packet in octets.
  *
+ * @param settings
  * @param http_packet A pointer to the HTTP packet to parse.
  * @param http_packet_len The length of the HTTP packet.
  *
  * @return A pointer to the parsed HTTP request, or nullptr if parsing fails.
  */
-http_request *parse_http_request(const uint8_t *const http_packet, const size_t http_packet_len) {
+http_request *parse_http_request(
+    const http_server_settings *const settings,
+    const uint8_t *const http_packet,
+    const size_t http_packet_len) {
     if (http_packet != nullptr && http_packet_len <= 5) {
         fprintf(stderr, "cannot parse http request as it appears empty\n");
         fflush(stderr);
@@ -374,14 +410,14 @@ http_request *parse_http_request(const uint8_t *const http_packet, const size_t 
     }
 
     const enum parse_http_request_status headers_parse_status =
-            parse_http_request_headers(http_packet, http_packet_len, request, &ptr);
+            parse_http_request_headers(settings, http_packet, http_packet_len, request, &ptr);
     if (headers_parse_status != PARSE_OK) {
         destroy_http_request(request);
         return nullptr;
     }
 
     const enum parse_http_request_status body_parse_status =
-            parse_http_request_body(http_packet, http_packet_len, request, &ptr);
+            parse_http_request_body(settings, http_packet, http_packet_len, request, &ptr);
     if (body_parse_status != PARSE_OK) {
         destroy_http_request(request);
         return nullptr;
